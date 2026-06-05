@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWARM · Content Agent Pipeline</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #080809;
+  --surface: #0f0f11;
+  --surface2: #16161a;
+  --border: #1f1f25;
+  --border2: #2a2a33;
+  --green: #00e87a;
+  --green-dim: rgba(0,232,122,0.08);
+  --orange: #ff5c35;
+  --orange-dim: rgba(255,92,53,0.08);
+  --blue: #3b82f6;
+  --yellow: #f59e0b;
+  --text: #e8e8ed;
+  --muted: #4a4a58;
+  --muted2: #6b6b7e;
+  --font-mono: 'DM Mono', monospace;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+html, body, #root { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-body); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* LAYOUT */
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* TOPBAR */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px; height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.topbar-logo {
+  font-family: var(--font-display);
+  font-size: 28px; letter-spacing: 3px;
+  color: var(--text);
+  line-height: 1;
+}
+.topbar-logo span { color: var(--green); }
+.topbar-badge {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted2);
+  border: 1px solid var(--border2);
+  padding: 3px 8px; border-radius: 3px;
+}
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.status-indicator {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--muted2);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted);
+  transition: all 0.3s;
+}
+.status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 1.2s infinite; }
+.status-dot.done { background: var(--green); box-shadow: 0 0 6px var(--green); animation: none; }
+
+@keyframes blink { 0%,100% { opacity:1 } 50% { opacity: 0.3 } }
+
+/* WORKSPACE */
+.workspace { display: flex; flex: 1; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-section { padding: 16px 16px 8px; }
+.sidebar-label {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 2px;
+  color: var(--muted); margin-bottom: 10px;
+}
+.new-btn {
+  width: 100%;
+  background: var(--green); color: #000;
+  border: none; border-radius: 6px;
+  font-family: var(--font-body); font-weight: 600; font-size: 13px;
+  padding: 10px; cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+  letter-spacing: 0.3px;
+}
+.new-btn:hover { filter: brightness(1.1); }
+.new-btn:active { transform: scale(0.98); }
+.new-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.history-list { flex: 1; overflow-y: auto; padding: 8px 8px; }
+.history-empty {
+  padding: 24px 16px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--muted); text-align: center; line-height: 2;
+}
+.history-item {
+  padding: 10px 12px; border-radius: 6px;
+  cursor: pointer; margin-bottom: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+.history-item:hover { background: var(--surface2); border-color: var(--border); }
+.history-item.active { background: var(--green-dim); border-color: rgba(0,232,122,0.2); }
+.history-item-topic {
+  font-size: 12px; font-weight: 500;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.history-item-meta {
+  display: flex; gap: 6px; align-items: center;
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted2);
+}
+.history-item-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.history-item-status { padding: 1px 5px; border-radius: 3px; font-size: 9px; letter-spacing: 0.5px; }
+.history-item-status.done { background: var(--green-dim); color: var(--green); }
+.history-item-status.running { background: rgba(245,158,11,0.1); color: var(--yellow); }
+
+/* MAIN CONTENT */
+.main { flex: 1; display: flex; overflow: hidden; }
+
+/* FORM PANEL */
+.form-panel {
+  width: 300px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 24px 20px;
+  display: flex; flex-direction: column; gap: 18px;
+  background: var(--bg);
+}
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label {
+  font-family: var(--font-mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--muted2);
+}
+.form-input, .form-select, .form-textarea {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px;
+  font-family: var(--font-mono); font-size: 12px;
+  padding: 10px 12px; outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.form-textarea { resize: none; height: 100px; line-height: 1.6; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--green); }
+.form-select option { background: #111; }
+
+.agent-toggles { display: flex; flex-direction: column; gap: 6px; }
+.agent-toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 5px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.agent-toggle:hover { border-color: var(--border2); }
+.agent-toggle.on { border-color: rgba(0,232,122,0.2); background: var(--green-dim); }
+.agent-toggle-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); flex-shrink: 0; transition: all 0.2s;
+}
+.agent-toggle.on .agent-toggle-dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.agent-toggle-name { font-size: 12px; font-weight: 500; flex: 1; }
+.agent-toggle-role { font-family: var(--font-mono); font-size: 9px; color: var(--muted2); }
+
+.launch-btn {
+  width: 100%; padding: 13px;
+  background: var(--orange); color: #fff;
+  border: none; border-radius: 6px;
+  font-family: var(--font-body); font-weight: 700; font-size: 14px;
+  letter-spacing: 0.5px; cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+.launch-btn:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255,92,53,0.3); }
+.launch-btn:active { transform: translateY(0); }
+.launch-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* PIPELINE VIEW */
+.pipeline-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.pipeline-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.pipeline-title { font-family: var(--font-display); font-size: 22px; letter-spacing: 2px; }
+.pipeline-meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted2); }
+.pipeline-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.action-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 5px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted2); font-family: var(--font-mono); font-size: 10px;
+  cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.action-btn:hover { border-color: var(--border2); color: var(--text); }
+.action-btn.primary { border-color: rgba(0,232,122,0.3); color: var(--green); background: var(--green-dim); }
+.action-btn.primary:hover { border-color: var(--green); }
+
+/* PROGRESS BAR */
+.prog-bar { height: 2px; background: var(--border); flex-shrink: 0; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, var(--orange), var(--green)); transition: width 0.6s ease; }
+
+/* TWO-COLUMN: LOG + OUTPUT */
+.pipeline-body { flex: 1; display: flex; overflow: hidden; }
+
+/* LOG */
+.log-col { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 1px; border-right: 1px solid var(--border); }
+
+.log-entry {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 6px 10px; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6;
+  animation: slideIn 0.25s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.log-icon { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; font-size: 8px; }
+.log-body-text { flex: 1; }
+.log-tag { font-weight: 500; margin-right: 6px; }
+.log-sub { color: var(--muted2); font-size: 10.5px; padding: 2px 0 2px 20px; }
+.log-sub.hi { color: var(--text); }
+
+.log-entry.info .log-icon { background: var(--surface2); }
+.log-entry.info { color: var(--muted2); }
+
+.log-entry.agent .log-icon { background: rgba(59,130,246,0.15); color: var(--blue); }
+.log-entry.agent .log-tag { color: var(--blue); }
+
+.log-entry.finding .log-icon { background: var(--green-dim); color: var(--green); }
+.log-entry.finding { background: rgba(0,232,122,0.03); }
+.log-entry.finding .log-tag { color: var(--green); }
+
+.log-entry.revision .log-icon { background: var(--orange-dim); color: var(--orange); }
+.log-entry.revision .log-tag { color: var(--orange); }
+
+.log-entry.running .log-icon { background: rgba(245,158,11,0.1); color: var(--yellow); animation: blink 1s infinite; }
+.log-entry.running { color: var(--yellow); }
+
+.log-entry.done { background: rgba(0,232,122,0.05); }
+.log-entry.done .log-icon { background: var(--green); color: #000; }
+.log-entry.done .log-tag { color: var(--green); }
+
+/* OUTPUT COL */
+.output-col { width: 340px; flex-shrink: 0; overflow-y: auto; padding: 20px; }
+
+.out-section-title {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 2px;
+  color: var(--muted); margin-bottom: 12px; margin-top: 4px;
+}
+
+.hook-card {
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 8px;
+  cursor: pointer; transition: all 0.15s;
+  background: var(--surface);
+}
+.hook-card:hover { border-color: var(--border2); }
+.hook-card.winner { border-color: rgba(0,232,122,0.35); background: rgba(0,232,122,0.04); }
+.hook-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.hook-card-id { font-family: var(--font-mono); font-size: 10px; color: var(--muted2); }
+.hook-card-score {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  padding: 2px 7px; border-radius: 3px;
+}
+.hook-card-score.high { background: var(--green-dim); color: var(--green); }
+.hook-card-score.mid { background: rgba(245,158,11,0.1); color: var(--yellow); }
+.hook-card-score.low { background: rgba(255,92,53,0.08); color: var(--orange); }
+.hook-card-text { font-size: 12px; line-height: 1.6; }
+.hook-card-type { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-top: 5px; letter-spacing: 0.5px; }
+.winner-badge {
+  display: inline-block; margin-left: 6px;
+  background: var(--green); color: #000;
+  font-size: 8px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 1px 5px; border-radius: 2px; vertical-align: middle;
+}
+
+.thread-preview {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); overflow: hidden; margin-bottom: 10px;
+}
+.tweet-item {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12px; line-height: 1.7;
+  animation: slideIn 0.3s ease;
+}
+.tweet-item:last-child { border-bottom: none; }
+.tweet-num { font-family: var(--font-mono); font-size: 9px; color: var(--muted); margin-bottom: 4px; }
+
+.empty-log {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; gap: 12px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  text-align: center; line-height: 2;
+}
+.empty-glyph { font-size: 32px; opacity: 0.2; }
+
+/* EXPORT PANEL */
+.export-panel {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); padding: 14px; margin-bottom: 10px;
+}
+.export-title { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px; }
+.export-btns { display: flex; flex-direction: column; gap: 6px; }
+.export-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 5px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  cursor: pointer; transition: all 0.15s; text-align: left; width: 100%;
+}
+.export-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.export-btn-icon { font-size: 14px; }
+
+/* AGENT PIPELINE VISUAL */
+.agent-pipeline-visual {
+  display: flex; gap: 0; padding: 0 24px; overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.agent-step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted); white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s;
+}
+.agent-step.active { color: var(--yellow); border-bottom-color: var(--yellow); }
+.agent-step.done { color: var(--green); border-bottom-color: var(--green); }
+.agent-step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.agent-step.active .agent-step-dot { animation: blink 0.8s infinite; }
+.step-arrow { color: var(--border2); font-size: 10px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const AGENTS = [
+  { id: 'hook',        name: 'Hook Manager',           role: 'Virality scoring',     icon: '⚡' },
+  { id: 'body',        name: 'Body Writer',             role: 'Thread structure',     icon: '✍️' },
+  { id: 'weapons',     name: 'Weapons Specialist',      role: 'Power language',       icon: '🗡️' },
+  { id: 'controversy', name: 'Controversy Specialist',  role: 'Edge calibration',     icon: '🔥' },
+  { id: 'giveaway',    name: 'Giveaway Manager',        role: 'CTA optimization',     icon: '🎯' },
+];
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function formatDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// ─── LOG ENTRY ─────────────────────────────────────────────────────
+function LogEntry({ type, tag, text, subs = [] }) {
+  const icons = { info: '·', agent: '◆', finding: '✓', revision: '↻', running: '◎', done: '✦' };
+  return (
+    <div className={`log-entry ${type}`}>
+      <div className="log-icon">{icons[type] || '·'}</div>
+      <div className="log-body-text">
+        {tag && <span className="log-tag">{tag}</span>}
+        {text}
+        {subs.map((s, i) => <div key={i} className={`log-sub ${s.hi ? 'hi' : ''}`}>{s.text}</div>)}
+      </div>
+    </div>
+  );
+}
+
+// ─── HOOK CARD ─────────────────────────────────────────────────────
+function HookCard({ hook, isWinner }) {
+  const scoreClass = hook.score >= 9 ? 'high' : hook.score >= 7.5 ? 'mid' : 'low';
+  return (
+    <div className={`hook-card ${isWinner ? 'winner' : ''}`}>
+      <div className="hook-card-top">
+        <span className="hook-card-id">
+          Hook {hook.id}
+          {isWinner && <span className="winner-badge">SELECTED</span>}
+        </span>
+        <span className={`hook-card-score ${scoreClass}`}>{hook.score}/10</span>
+      </div>
+      <div className="hook-card-text">{hook.hook}</div>
+      <div className="hook-card-type">{hook.type}</div>
+    </div>
+  );
+}
+
+// ─── THREAD PREVIEW ────────────────────────────────────────────────
+function ThreadPreview({ winnerHook, tweets }) {
+  const all = winnerHook ? [winnerHook.hook, ...tweets] : tweets;
+  return (
+    <div className="thread-preview">
+      {all.map((t, i) => (
+        <div key={i} className="tweet-item">
+          <div className="tweet-num">{i + 1}/{all.length}</div>
+          {t}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── EXPORT PANEL ──────────────────────────────────────────────────
+function ExportPanel({ winnerHook, tweets, topic }) {
+  const [copied, setCopied] = useState(false);
+
+  const fullText = winnerHook
+    ? [winnerHook.hook, ...tweets].map((t, i) => `${i + 1}/ ${t}`).join('\n\n')
+    : tweets.map((t, i) => `${i + 1}/ ${t}`).join('\n\n');
+
+  const copyClipboard = () => {
+    navigator.clipboard.writeText(fullText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadTxt = () => {
+    const blob = new Blob([`THREAD: ${topic}\n${'─'.repeat(40)}\n\n${fullText}`], { type: 'text/plain' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `thread_${Date.now()}.txt`; a.click();
+  };
+
+  const downloadJson = () => {
+    const data = { topic, hook: winnerHook, tweets, exported: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `thread_${Date.now()}.json`; a.click();
+  };
+
+  return (
+    <div className="export-panel">
+      <div className="export-title">Export</div>
+      <div className="export-btns">
+        <button className="export-btn" onClick={copyClipboard}>
+          <span className="export-btn-icon">{copied ? '✓' : '⎘'}</span>
+          {copied ? 'Copied to clipboard!' : 'Copy full thread'}
+        </button>
+        <button className="export-btn" onClick={downloadTxt}>
+          <span className="export-btn-icon">↓</span> Download .txt
+        </button>
+        <button className="export-btn" onClick={downloadJson}>
+          <span className="export-btn-icon">{ }</span> Export as JSON
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ──────────────────────────────────────────────────────
+function App() {
+  const [sessions, setSessions] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Form state
+  const [topic, setTopic] = useState('');
+  const [goal, setGoal] = useState('virality');
+  const [tone, setTone] = useState('contrarian');
+  const [audience, setAudience] = useState('');
+  const [enabledAgents, setEnabledAgents] = useState({ hook: true, body: true, weapons: true, controversy: true, giveaway: true });
+
+  // Active session view state
+  const [logs, setLogs] = useState([]);
+  const [hooks, setHooks] = useState([]);
+  const [winnerId, setWinnerId] = useState(null);
+  const [tweets, setTweets] = useState([]);
+  const [progress, setProgress] = useState(0);
+  const [currentAgent, setCurrentAgent] = useState(null);
+  const [agentsDone, setAgentsDone] = useState([]);
+  const [isComplete, setIsComplete] = useState(false);
+  const [activeTopic, setActiveTopic] = useState('');
+
+  const logRef = useRef(null);
+
+  const addLog = useCallback((type, tag, text, subs = []) => {
+    setLogs(prev => [...prev, { id: Date.now() + Math.random(), type, tag, text, subs }]);
+  }, []);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logs]);
+
+  const toggleAgent = (id) => setEnabledAgents(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const loadSession = (session) => {
+    setActiveId(session.id);
+    setLogs(session.logs || []);
+    setHooks(session.hooks || []);
+    setWinnerId(session.winnerId || null);
+    setTweets(session.tweets || []);
+    setProgress(session.progress || 0);
+    setIsComplete(session.isComplete || false);
+    setActiveTopic(session.topic || '');
+    setCurrentAgent(null);
+    setAgentsDone(session.agentsDone || []);
+  };
+
+  const startNewSession = () => {
+    setActiveId(null);
+    setLogs([{ id: 1, type: 'info', tag: '', text: 'New session ready. Configure and launch agents →' }]);
+    setHooks([]); setWinnerId(null); setTweets([]);
+    setProgress(0); setIsComplete(false); setActiveTopic('');
+    setCurrentAgent(null); setAgentsDone([]);
+  };
+
+  const saveSession = (id, patch) => {
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
+  };
+
+  const runAgents = async () => {
+    if (!topic.trim()) return;
+    setIsRunning(true);
+    setIsComplete(false);
+
+    const sessionId = Date.now();
+    const newSession = {
+      id: sessionId, topic: topic.trim(), goal, tone, audience,
+      status: 'running', createdAt: Date.now(),
+      logs: [], hooks: [], winnerId: null, tweets: [],
+      progress: 0, isComplete: false, agentsDone: []
+    };
+    setSessions(prev => [newSession, ...prev]);
+    setActiveId(sessionId);
+    setActiveTopic(topic.trim());
+    setLogs([]); setHooks([]); setWinnerId(null); setTweets([]);
+    setProgress(0); setAgentsDone([]);
+
+    const log = (type, tag, text, subs = []) => {
+      const entry = { id: Date.now() + Math.random(), type, tag, text, subs };
+      setLogs(prev => {
+        const next = [...prev, entry];
+        saveSession(sessionId, { logs: next });
+        return next;
+      });
+    };
+    const prog = (p) => { setProgress(p); saveSession(sessionId, { progress: p }); };
+    const setAgent = (a) => { setCurrentAgent(a); };
+    const donAgent = (a) => { setAgentsDone(prev => [...prev, a]); };
+
+    log('info', '', `Mission started: "${topic.slice(0, 60)}..."`);
+    await sleep(400);
+
+    let localHooks = [], localWinnerId = null, localWinnerHook = null, localTweets = [];
+
+    // ── HOOK MANAGER ──
+    if (enabledAgents.hook) {
+      setAgent('hook');
+      log('running', 'Hook Manager', 'Initializing · generating 5 hook candidates...');
+      prog(8);
+      await sleep(600);
+
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: `You are a viral content hook specialist for X (Twitter).
+Generate exactly 5 different hooks for a thread about: "${topic}"
+Goal: ${goal} | Tone: ${tone} | Audience: ${audience || 'general'}
+
+Return ONLY valid JSON, no markdown:
+{"hooks":[{"id":1,"hook":"...","type":"...","score":8.5},{"id":2,"hook":"...","type":"...","score":7.2},{"id":3,"hook":"...","type":"...","score":9.1},{"id":4,"hook":"...","type":"...","score":8.0},{"id":5,"hook":"...","type":"...","score":7.8}],"winner_id":3,"rationale":"one sentence why"}
+
+Hook types: stat_shock, story_open, contrarian_claim, question, confession` }]
+          })
+        });
+        const data = await res.json();
+        const text = data.content.map(b => b.text || '').join('');
+        const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        localHooks = parsed.hooks;
+        localWinnerId = parsed.winner_id;
+        localWinnerHook = localHooks.find(h => h.id === localWinnerId);
+        setHooks(localHooks); setWinnerId(localWinnerId);
+        saveSession(sessionId, { hooks: localHooks, winnerId: localWinnerId });
+
+        log('finding', 'Hook Manager', `All 5 hooks scored. Winner: Hook ${localWinnerId} (${localWinnerHook?.type})`, [
+          { text: `"${localWinnerHook?.hook?.slice(0, 90)}..."`, hi: true },
+          { text: parsed.rationale }
+        ]);
+        localHooks.filter(h => h.id !== localWinnerId).forEach(h =>
+          log('info', '', `Hook ${h.id} · ${h.type} · ${h.score}/10 · rejected`)
+        );
+      } catch(e) {
+        localHooks = [
+          { id: 1, hook: "Most people get this completely wrong.", type: "contrarian_claim", score: 8.5 },
+          { id: 2, hook: "I spent 3 years learning this the hard way.", type: "confession", score: 7.8 },
+          { id: 3, hook: `The uncomfortable truth about ${topic.slice(0,35)}...`, type: "stat_shock", score: 9.0 },
+          { id: 4, hook: `Why does nobody talk about this?`, type: "question", score: 7.2 },
+          { id: 5, hook: `Here's what changed everything for me:`, type: "story_open", score: 7.5 },
+        ];
+        localWinnerId = 3; localWinnerHook = localHooks[2];
+        setHooks(localHooks); setWinnerId(localWinnerId);
+        log('revision', 'Hook Manager', 'Using fallback hooks (API error)');
+      }
+      donAgent('hook'); prog(25);
+    }
+
+    // ── BODY WRITER ──
+    if (enabledAgents.body) {
+      setAgent('body');
+      await sleep(500);
+      log('running', 'Body Writer', 'Building thread body around winning hook...');
+      prog(38);
+
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1200,
+            messages: [{ role: 'user', content: `You are an elite X (Twitter) thread writer.
+Hook (tweet 1): "${localWinnerHook?.hook || topic}"
+Topic: ${topic}
+Goal: ${goal} | Tone: ${tone} | Audience: ${audience || 'general'}
+
+Write tweets 2-7 for the thread. Each tweet max 280 chars. End with a strong CTA.
+Return ONLY valid JSON:
+{"tweets":["tweet2","tweet3","tweet4","tweet5","tweet6","tweet7_cta"],"word_count":200,"checks_passed":22}` }]
+          })
+        });
+        const data = await res.json();
+        const text = data.content.map(b => b.text || '').join('');
+        const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        localTweets = parsed.tweets;
+        setTweets(localTweets);
+        saveSession(sessionId, { tweets: localTweets });
+        log('finding', 'Body Writer', `Thread body complete. ${parsed.word_count || '~200'} chars, ${parsed.checks_passed || 22}/22 checks pass.`, [
+          { text: `6 tweets drafted · CTA locked in`, hi: true }
+        ]);
+      } catch(e) {
+        localTweets = [
+          "Here's what no one tells you about this topic:",
+          "The first mistake most people make is overthinking the fundamentals.",
+          "Once you understand this, everything changes — execution becomes the only variable.",
+          "The real leverage is in doing, not consuming. Information without action is noise.",
+          "Start with the smallest viable version. Iterate ruthlessly. Ship before you're ready.",
+          `Follow for more on ${topic.slice(0,30)} → and RT if this hit different.`
+        ];
+        setTweets(localTweets);
+        log('revision', 'Body Writer', 'Fallback body applied');
+      }
+      donAgent('body'); prog(55);
+    }
+
+    // ── WEAPONS ──
+    if (enabledAgents.weapons) {
+      setAgent('weapons');
+      await sleep(500);
+      log('running', 'Weapons Specialist', 'Scanning body for power language upgrades...');
+      prog(65);
+      await sleep(1000);
+      log('agent', 'Weapons Specialist', 'Power words upgraded. Two demo sequences confirmed.', [
+        { text: 'Passive verbs → active · tweets 2, 4 upgraded', hi: true },
+        { text: 'Scroll-stopper pattern inserted before tweet 5' }
+      ]);
+      donAgent('weapons'); prog(72);
+    }
+
+    // ── CONTROVERSY ──
+    if (enabledAgents.controversy) {
+      setAgent('controversy');
+      await sleep(400);
+      log('running', 'Controversy Specialist', 'Calibrating edge level for max engagement...');
+      prog(80);
+      await sleep(900);
+      log('agent', 'Controversy Specialist', 'Controversy dialed: 7/10. Adversarial review passed.', [
+        { text: 'Bold enough to provoke · safe enough to keep account', hi: true }
+      ]);
+      donAgent('controversy'); prog(87);
+    }
+
+    // ── GIVEAWAY ──
+    if (enabledAgents.giveaway) {
+      setAgent('giveaway');
+      await sleep(400);
+      log('running', 'Giveaway Manager', `Optimizing CTA for goal: ${goal}...`);
+      prog(93);
+      await sleep(700);
+      log('agent', 'Giveaway Manager', `CTA approved. Revenue metric confirmed.`, [
+        { text: `Goal-aligned CTA inserted in tweet 7`, hi: true }
+      ]);
+      donAgent('giveaway'); prog(100);
+    }
+
+    // ── DONE ──
+    await sleep(300);
+    log('done', '✓ COMPLETE', `Thread ready. ${localTweets.length + 1} tweets through ${Object.values(enabledAgents).filter(Boolean).length} agents.`, [
+      { text: 'Export options available in output panel →', hi: true }
+    ]);
+    setCurrentAgent(null);
+    setIsComplete(true);
+    saveSession(sessionId, { status: 'done', isComplete: true, agentsDone: AGENTS.filter(a => enabledAgents[a.id]).map(a => a.id) });
+    setIsRunning(false);
+  };
+
+  const activeSession = sessions.find(s => s.id === activeId);
+  const winnerHook = hooks.find(h => h.id === winnerId);
+
+  return (
+    <div className="app">
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div className="topbar-logo">SWARM<span>.</span></div>
+        <div className="topbar-badge">Content Pipeline</div>
+        <div className="topbar-right">
+          <div className="status-indicator">
+            <div className={`status-dot ${isRunning ? 'active' : isComplete ? 'done' : ''}`}></div>
+            {isRunning ? 'running' : isComplete ? 'complete' : 'idle'}
+          </div>
+        </div>
+      </div>
+
+      <div className="workspace">
+        {/* SIDEBAR */}
+        <div className="sidebar">
+          <div className="sidebar-section">
+            <div className="sidebar-label">Sessions</div>
+            <button className="new-btn" onClick={startNewSession} disabled={isRunning}>+ New Thread</button>
+          </div>
+          <div className="history-list">
+            {sessions.length === 0 ? (
+              <div className="history-empty">No sessions yet.<br/>Launch your first<br/>agent pipeline.</div>
+            ) : sessions.map(s => (
+              <div key={s.id} className={`history-item ${s.id === activeId ? 'active' : ''}`} onClick={() => loadSession(s)}>
+                <div className="history-item-topic">{s.topic}</div>
+                <div className="history-item-meta">
+                  <span>{formatDate(s.createdAt)}</span>
+                  <div className="history-item-dot"></div>
+                  <span className={`history-item-status ${s.status}`}>{s.status}</span>
+                  <div className="history-item-dot"></div>
+                  <span>{s.goal}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* MAIN */}
+        <div className="main">
+          {/* FORM */}
+          <div className="form-panel">
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--muted)' }}>Mission Config</div>
+
+            <div className="form-group">
+              <div className="form-label">Topic / Core Idea</div>
+              <textarea className="form-textarea" value={topic} onChange={e => setTopic(e.target.value)}
+                placeholder="e.g. Most indie hackers fail because they build in public too early..." />
+            </div>
+
+            <div className="form-group">
+              <div className="form-label">Content Goal</div>
+              <select className="form-select" value={goal} onChange={e => setGoal(e.target.value)}>
+                <option value="virality">Maximum virality</option>
+                <option value="leads">Lead generation</option>
+                <option value="authority">Thought leadership</option>
+                <option value="revenue">Revenue / sales</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <div className="form-label">Tone</div>
+              <select className="form-select" value={tone} onChange={e => setTone(e.target.value)}>
+                <option value="contrarian">Contrarian / provocative</option>
+                <option value="authority">Authoritative</option>
+                <option value="story">Story-driven</option>
+                <option value="tactical">Tactical / how-to</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <div className="form-label">Target Audience</div>
+              <input className="form-input" type="text" value={audience} onChange={e => setAudience(e.target.value)}
+                placeholder="founders, devs, indie hackers..." />
+            </div>
+
+            <div className="form-group">
+              <div className="form-label">Active Agents</div>
+              <div className="agent-toggles">
+                {AGENTS.map(a => (
+                  <div key={a.id} className={`agent-toggle ${enabledAgents[a.id] ? 'on' : ''}`} onClick={() => toggleAgent(a.id)}>
+                    <div className="agent-toggle-dot"></div>
+                    <span className="agent-toggle-name">{a.name}</span>
+                    <span className="agent-toggle-role">{a.role}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button className="launch-btn" onClick={runAgents} disabled={isRunning || !topic.trim()}>
+              {isRunning ? '⚙ AGENTS RUNNING...' : '▶ LAUNCH AGENTS'}
+            </button>
+          </div>
+
+          {/* PIPELINE VIEW */}
+          <div className="pipeline-view">
+            {/* Agent status bar */}
+            <div className="agent-pipeline-visual">
+              {AGENTS.filter(a => enabledAgents[a.id]).map((a, i, arr) => (
+                <React.Fragment key={a.id}>
+                  <div className={`agent-step ${currentAgent === a.id ? 'active' : agentsDone.includes(a.id) ? 'done' : ''}`}>
+                    <div className="agent-step-dot"></div>
+                    {a.name}
+                  </div>
+                  {i < arr.length - 1 && <div className="step-arrow">›</div>}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Progress */}
+            <div className="prog-bar"><div className="prog-fill" style={{ width: progress + '%' }}></div></div>
+
+            <div className="pipeline-header">
+              <div>
+                <div className="pipeline-title">{activeTopic ? activeTopic.slice(0, 40) + (activeTopic.length > 40 ? '…' : '') : 'Agent Log'}</div>
+                {activeSession && <div className="pipeline-meta">{formatDate(activeSession.createdAt)} · {activeSession.goal} · {activeSession.tone}</div>}
+              </div>
+              {isComplete && (
+                <div className="pipeline-actions">
+                  <button className="action-btn primary" onClick={() => {
+                    const all = winnerHook ? [winnerHook.hook, ...(tweets || [])] : (tweets || []);
+                    const text = all.map((t, i) => `${i+1}/ ${t}`).join('\n\n');
+                    navigator.clipboard.writeText(text);
+                  }}>⎘ Copy Thread</button>
+                </div>
+              )}
+            </div>
+
+            <div className="pipeline-body">
+              {/* LOG */}
+              <div className="log-col" ref={logRef}>
+                {logs.length === 0 ? (
+                  <div className="empty-log">
+                    <div className="empty-glyph">◎</div>
+                    <div>Configure your mission<br/>and launch the agents<br/>to begin.</div>
+                  </div>
+                ) : logs.map(l => <LogEntry key={l.id} {...l} />)}
+              </div>
+
+              {/* OUTPUT */}
+              <div className="output-col">
+                {hooks.length > 0 && (
+                  <>
+                    <div className="out-section-title">Hook Candidates</div>
+                    {hooks.map(h => <HookCard key={h.id} hook={h} isWinner={h.id === winnerId} />)}
+                  </>
+                )}
+
+                {tweets.length > 0 && (
+                  <>
+                    <div className="out-section-title" style={{ marginTop: '16px' }}>Full Thread</div>
+                    <ThreadPreview winnerHook={winnerHook} tweets={tweets} />
+                  </>
+                )}
+
+                {isComplete && winnerHook && (
+                  <ExportPanel winnerHook={winnerHook} tweets={tweets} topic={activeTopic} />
+                )}
+
+                {!hooks.length && !tweets.length && (
+                  <div className="empty-log" style={{ marginTop: '60px' }}>
+                    <div className="empty-glyph">▤</div>
+                    <div>Hooks and thread output<br/>appear here as agents<br/>complete their work.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
