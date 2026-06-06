@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWARM · Video Script Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080809;--surface:#0f0f11;--surface2:#16161a;
+  --border:#1f1f25;--border2:#2a2a33;
+  --green:#00e87a;--green-dim:rgba(0,232,122,0.07);
+  --orange:#ff5c35;--blue:#3b82f6;--yellow:#f59e0b;--purple:#a78bfa;
+  --text:#e8e8ed;--muted:#4a4a58;--muted2:#6b6b7e;
+  --font-mono:'DM Mono',monospace;--font-display:'Bebas Neue',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body)}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:16px;padding:0 24px;height:52px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.topbar-logo{font-family:var(--font-display);font-size:28px;letter-spacing:3px;color:var(--text);line-height:1}
+.topbar-logo span{color:var(--green)}
+.topbar-badge{font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);border:1px solid var(--border2);padding:3px 8px;border-radius:3px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10px;color:var(--muted2)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all 0.3s}
+.status-dot.active{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.2s infinite}
+.status-dot.done{background:var(--green);box-shadow:0 0 6px var(--green);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.workspace{display:flex;flex:1;overflow:hidden}
+.sidebar{width:240px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-top{padding:16px 16px 8px}
+.sidebar-label{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px}
+.new-btn{width:100%;background:var(--green);color:#000;border:none;border-radius:6px;font-family:var(--font-body);font-weight:600;font-size:13px;padding:10px;cursor:pointer;transition:filter 0.15s,transform 0.1s}
+.new-btn:hover{filter:brightness(1.1)}.new-btn:active{transform:scale(0.98)}.new-btn:disabled{opacity:0.4;cursor:not-allowed}
+.history-list{flex:1;overflow-y:auto;padding:8px}
+.history-empty{padding:24px 12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:center;line-height:2}
+.history-item{padding:10px 12px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid transparent;transition:all 0.15s}
+.history-item:hover{background:var(--surface2);border-color:var(--border)}.history-item.active{background:var(--green-dim);border-color:rgba(0,232,122,0.2)}
+.history-item-topic{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.history-item-meta{display:flex;gap:6px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--muted2)}
+.h-dot{width:4px;height:4px;border-radius:50%;background:var(--muted)}
+.h-status{padding:1px 5px;border-radius:3px;font-size:9px}
+.h-status.done{background:var(--green-dim);color:var(--green)}.h-status.running{background:rgba(245,158,11,0.1);color:var(--yellow)}
+.main{flex:1;display:flex;overflow:hidden}
+.form-panel{width:280px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;gap:18px;background:var(--bg)}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted2)}
+.form-input,.form-select,.form-textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;font-family:var(--font-mono);font-size:12px;padding:10px 12px;outline:none;transition:border-color 0.2s;width:100%}
+.form-textarea{resize:none;height:85px;line-height:1.6}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--green)}
+.form-select option{background:#111}
+.hook-pills{display:flex;flex-wrap:wrap;gap:6px}
+.hook-pill{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:11px;font-family:var(--font-mono);color:var(--muted2);cursor:pointer;transition:all 0.15s;user-select:none}
+.hook-pill:hover{border-color:var(--border2)}.hook-pill.on{border-color:rgba(0,232,122,0.3);background:var(--green-dim);color:var(--green)}
+.agent-card{border:1px solid var(--border);border-radius:6px;padding:10px 12px;background:var(--surface)}
+.agent-card-header{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;margin-bottom:4px}
+.agent-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:all 0.3s}
+.agent-dot.active{background:var(--yellow);box-shadow:0 0 6px var(--yellow);animation:blink 0.8s infinite}
+.agent-dot.done{background:var(--green);box-shadow:0 0 5px var(--green);animation:none}
+.agent-card-role{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-left:15px}
+.launch-btn{width:100%;padding:13px;background:var(--orange);color:#fff;border:none;border-radius:6px;font-family:var(--font-body);font-weight:700;font-size:14px;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.launch-btn:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 20px rgba(255,92,53,0.3)}
+.launch-btn:active{transform:translateY(0)}.launch-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;box-shadow:none}
+.pipeline-view{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.agent-bar{display:flex;padding:0 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;overflow-x:auto}
+.agent-step{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:11px;font-family:var(--font-mono);color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;transition:all 0.3s}
+.agent-step.active{color:var(--yellow);border-bottom-color:var(--yellow)}.agent-step.done{color:var(--green);border-bottom-color:var(--green)}
+.agent-step-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.agent-step.active .agent-step-dot{animation:blink 0.8s infinite}
+.step-arrow{color:var(--border2);font-size:10px;align-self:center}
+.prog-bar{height:2px;background:var(--border);flex-shrink:0}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--orange),var(--green));transition:width 0.6s ease}
+.pipeline-header{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.pipeline-title{font-family:var(--font-display);font-size:22px;letter-spacing:2px}
+.pipeline-meta{font-family:var(--font-mono);font-size:10px;color:var(--muted2)}
+.pipeline-actions{margin-left:auto;display:flex;gap:8px}
+.action-btn{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted2);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:all 0.15s;text-transform:uppercase;letter-spacing:0.5px}
+.action-btn:hover{border-color:var(--border2);color:var(--text)}
+.action-btn.primary{border-color:rgba(0,232,122,0.3);color:var(--green);background:var(--green-dim)}
+.action-btn.primary:hover{border-color:var(--green)}
+.pipeline-body{flex:1;display:flex;overflow:hidden}
+.log-col{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:1px;border-right:1px solid var(--border)}
+.log-entry{display:flex;gap:12px;align-items:flex-start;padding:6px 10px;border-radius:5px;font-family:var(--font-mono);font-size:11.5px;line-height:1.6;animation:slideIn 0.25s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+.log-icon{width:18px;height:18px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;font-size:8px}
+.log-body-txt{flex:1}.log-tag{font-weight:500;margin-right:6px}
+.log-sub{color:var(--muted2);font-size:10.5px;padding:2px 0 2px 20px}.log-sub.hi{color:var(--text)}
+.log-entry.info .log-icon{background:var(--surface2)}.log-entry.info{color:var(--muted2)}
+.log-entry.agent .log-icon{background:rgba(59,130,246,0.15);color:var(--blue)}.log-entry.agent .log-tag{color:var(--blue)}
+.log-entry.finding .log-icon{background:var(--green-dim);color:var(--green)}.log-entry.finding{background:rgba(0,232,122,0.03)}.log-entry.finding .log-tag{color:var(--green)}
+.log-entry.revision .log-icon{background:rgba(255,92,53,0.08);color:var(--orange)}.log-entry.revision .log-tag{color:var(--orange)}
+.log-entry.running .log-icon{background:rgba(245,158,11,0.1);color:var(--yellow);animation:blink 1s infinite}.log-entry.running{color:var(--yellow)}
+.log-entry.done{background:rgba(0,232,122,0.05)}.log-entry.done .log-icon{background:var(--green);color:#000}.log-entry.done .log-tag{color:var(--green)}
+.empty-log{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:center;line-height:2}
+.output-col{width:360px;flex-shrink:0;overflow-y:auto;padding:20px}
+.out-section-title{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px;margin-top:4px}
+.script-card{border:1px solid var(--green);border-radius:10px;background:var(--surface);overflow:hidden;animation:fadeIn 0.4s ease;margin-bottom:12px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.script-card-top{background:var(--surface2);padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sc-badge{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:3px;text-transform:uppercase}
+.sc-badge.hook{background:var(--green-dim);color:var(--green)}.sc-badge.platform{background:rgba(167,139,250,0.1);color:var(--purple)}
+.sc-duration{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted2)}
+.script-section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sc-tag{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:7px}
+.sc-hook{font-size:15px;line-height:1.5;color:var(--green);font-style:italic;font-family:var(--font-mono)}
+.sc-body{font-size:13px;line-height:1.85;color:var(--text);white-space:pre-line}
+.sc-cta{font-size:13px;line-height:1.7;color:var(--purple);font-style:italic}
+.sc-caption{font-size:12px;line-height:1.7;color:var(--text);white-space:pre-line}
+.sc-hashtags{font-family:var(--font-mono);font-size:10px;line-height:1.8;color:var(--green);word-break:break-word}
+.sc-why{font-family:var(--font-mono);font-size:10px;color:var(--purple);padding:10px 16px;border-top:1px solid var(--border);background:rgba(167,139,250,0.03)}
+.sc-evidence{padding:12px 16px;border-top:1px solid var(--border);background:rgba(255,255,255,0.015)}
+.sc-evidence-line{font-family:var(--font-mono);font-size:10px;line-height:1.65;color:var(--muted2);margin-bottom:5px}
+.sc-evidence-line:last-child{margin-bottom:0}.sc-evidence-line strong{color:var(--text);font-weight:500}
+.sources-row{display:flex;gap:6px;padding:10px 16px;border-top:1px solid var(--border);background:var(--surface2)}
+.src-chip{font-size:9px;font-family:var(--font-mono);padding:2px 8px;border-radius:3px;letter-spacing:0.5px}
+.src-chip.reddit{background:rgba(255,77,109,0.1);color:#ff4d6d}
+.src-chip.twitter{background:rgba(59,130,246,0.1);color:var(--blue)}
+.src-chip.amazon{background:rgba(245,158,11,0.1);color:var(--yellow)}
+.sc-actions{display:flex;gap:6px;padding:12px 16px;border-top:1px solid var(--border)}
+.sc-btn{flex:1;padding:8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted2);font-family:var(--font-mono);font-size:10px;cursor:pointer;transition:all 0.15s;letter-spacing:0.5px}
+.sc-btn:hover{border-color:var(--green);color:var(--green);background:var(--green-dim)}.sc-btn.copied{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.out-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:center;line-height:2}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="topbar-logo">SWARM<span>.</span></div>
+    <div class="topbar-badge">Video Script Agent</div>
+    <div class="topbar-right"><span id="navStatus">idle</span></div>
+  </div>
+  <div class="workspace">
+    <div class="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-label">Sessions</div>
+        <button class="new-btn" onclick="newSession()">+ New Script</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">No sessions yet.<br/>Generate your first<br/>script to begin.</div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="form-panel">
+        <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted)">Mission Config</div>
+        <div class="form-group">
+          <div class="form-label">Research Product</div>
+          <textarea class="form-textarea" id="topicInput" placeholder="e.g. Stanley water bottle, posture corrector, AI writing tools..."></textarea>
+        </div>
+        <div class="form-group">
+          <div class="form-label">My Product</div>
+          <input class="form-input" type="text" id="productInput" placeholder="e.g. your bottle, app, supplement..." />
+        </div>
+        <div class="form-group">
+          <div class="form-label">How It Solves It</div>
+          <textarea class="form-textarea" id="solutionInput" placeholder="e.g. leak-proof lid, easier cleaning, better warranty, faster setup..."></textarea>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Platform</div>
+          <select class="form-select" id="platformSel">
+            <option>TikTok</option>
+            <option>Instagram Reels</option>
+            <option>YouTube Shorts</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Your Angle</div>
+          <input class="form-input" type="text" id="angleInput" placeholder="e.g. mom, skeptic, beginner..." />
+        </div>
+        <div class="form-group">
+          <div class="form-label">Hook Style</div>
+          <div class="hook-pills">
+            <div class="hook-pill on" onclick="setHook(this)">Pain Point</div>
+            <div class="hook-pill" onclick="setHook(this)">Hot Take</div>
+            <div class="hook-pill" onclick="setHook(this)">Story</div>
+            <div class="hook-pill" onclick="setHook(this)">Surprising Fact</div>
+            <div class="hook-pill" onclick="setHook(this)">Question</div>
+            <div class="hook-pill" onclick="setHook(this)">POV</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Agent</div>
+          <div class="agent-card">
+            <div class="agent-card-header"><div class="agent-dot" id="agentDot"></div>Script Agent</div>
+            <div class="agent-card-role">Live web search · Reddit · X · Amazon</div>
+          </div>
+        </div>
+        <button class="launch-btn" id="launchBtn" onclick="runAgent()">▶ LAUNCH AGENT</button>
+      </div>
+
+      <div class="pipeline-view">
+        <div class="agent-bar">
+          <div class="agent-step" id="step-reddit"><div class="agent-step-dot"></div>Reddit</div>
+          <div class="step-arrow">›</div>
+          <div class="agent-step" id="step-twitter"><div class="agent-step-dot"></div>X / Twitter</div>
+          <div class="step-arrow">›</div>
+          <div class="agent-step" id="step-amazon"><div class="agent-step-dot"></div>Amazon</div>
+          <div class="step-arrow">›</div>
+          <div class="agent-step" id="step-write"><div class="agent-step-dot"></div>Script Writer</div>
+          <div class="step-arrow">›</div>
+          <div class="agent-step" id="step-done"><div class="agent-step-dot"></div>Done</div>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="pipeline-header">
+          <div>
+            <div class="pipeline-title" id="pipelineTitle">Agent Log</div>
+            <div class="pipeline-meta" id="pipelineMeta">Configure and launch →</div>
+          </div>
+          <div class="pipeline-actions" id="pipelineActions"></div>
+        </div>
+        <div class="pipeline-body">
+          <div class="log-col" id="logCol">
+            <div class="empty-log">
+              <div style="font-size:28px;opacity:0.12">◎</div>
+              <div>Enter a topic and launch.<br><br>Agent does live web search<br>across Reddit, X and Amazon<br>then writes a unique script.</div>
+            </div>
+          </div>
+          <div class="output-col" id="outputCol">
+            <div class="out-empty">
+              <div style="font-size:28px;opacity:0.12">▤</div>
+              <div>Script appears here<br>once research<br>is complete.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let hookStyle = 'Pain Point';
+let sessions = [];
+const API_CANDIDATES = location.protocol === 'file:' ? ['http://127.0.0.1:8765','http://127.0.0.1:8766'] : [''];
+
+function setHook(el) {
+  document.querySelectorAll('.hook-pill').forEach(p => p.classList.remove('on'));
+  el.classList.add('on'); hookStyle = el.textContent;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function addLog(type, tag, text, subs=[]) {
+  const col = document.getElementById('logCol');
+  if (col.querySelector('.empty-log')) col.innerHTML = '';
+  const icons = {info:'·',agent:'◆',finding:'✓',revision:'↻',running:'◎',done:'✦'};
+  const el = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  const subsHtml = subs.map(s=>`<div class="log-sub ${s.hi?'hi':''}">${s.text}</div>`).join('');
+  el.innerHTML = `<div class="log-icon">${icons[type]||'·'}</div><div class="log-body-txt">${tag?`<span class="log-tag">${tag}</span>`:''}${text}${subsHtml}</div>`;
+  col.appendChild(el); col.scrollTop = col.scrollHeight;
+}
+
+function setStep(id, state) {
+  ['reddit','twitter','amazon','write','done'].forEach(s => {
+    const el = document.getElementById('step-'+s);
+    if (el) el.className = 'agent-step'+(s===id?' '+state:'');
+  });
+}
+function setProgress(p) { document.getElementById('progFill').style.width = p+'%'; }
+function setNav(text, cls) {
+  document.getElementById('navStatus').textContent = text;
+  document.getElementById('statusDot').className = 'status-dot '+(cls||'');
+  document.getElementById('agentDot').className = 'agent-dot '+(cls==='active'?'active':cls==='done'?'done':'');
+}
+
+function newSession() {
+  document.getElementById('logCol').innerHTML = '<div class="empty-log"><div style="font-size:28px;opacity:0.12">◎</div><div>Enter a topic and launch.</div></div>';
+  document.getElementById('outputCol').innerHTML = '<div class="out-empty"><div style="font-size:28px;opacity:0.12">▤</div><div>Script appears here.</div></div>';
+  document.getElementById('pipelineTitle').textContent = 'Agent Log';
+  document.getElementById('pipelineMeta').textContent = 'Configure and launch →';
+  document.getElementById('pipelineActions').innerHTML = '';
+  setProgress(0); setNav('idle','');
+  ['reddit','twitter','amazon','write','done'].forEach(s=>{const el=document.getElementById('step-'+s);if(el)el.className='agent-step';});
+}
+
+function addToHistory(s) {
+  const list = document.getElementById('historyList');
+  if (list.querySelector('.history-empty')) list.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'history-item active';
+  el.id = 'hist-'+s.id;
+  el.innerHTML = `
+    <div class="history-item-topic">${esc(s.topic)}</div>
+    <div class="history-item-meta">
+      <span>${new Date(s.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+      <div class="h-dot"></div>
+      <span class="h-status running" id="hstatus-${s.id}">running</span>
+      <div class="h-dot"></div>
+      <span>${s.platform}</span>
+    </div>`;
+  list.prepend(el);
+  document.querySelectorAll('.history-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function esc(v) {
+  return String(v || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function wordsFromTopic(topic) {
+  return topic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+}
+
+function cleanLine(line) {
+  return line
+    .replace(/<script[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ')
+    .replace(/\s+/g,' ').replace(/^[-#*> ]+/,'').trim();
+}
+
+async function fetchText(url, timeout=14000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function apiGet(path) {
+  let lastErr;
+  for (const base of API_CANDIDATES) {
+    try {
+      const res = await fetch(base + path);
+      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('local API unavailable');
+}
+
+async function searchJina(query) {
+  const searchUrl = 'https://duckduckgo.com/html/?q=' + encodeURIComponent(query);
+  const url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(searchUrl);
+  return fetchText(url, 18000);
+}
+
+async function searchLocal(source, topic) {
+  const url = `/api/research?source=${encodeURIComponent(source)}&topic=${encodeURIComponent(topic)}`;
+  const data = await apiGet(url);
+  if (!data.text && !data.items?.length) throw new Error('empty local research result');
+  return data;
+}
+
+async function searchReddit(topic) {
+  try { return await searchLocal('reddit', topic); } catch(e) {}
+  const directUrl = 'https://www.reddit.com/search.json?q=' + encodeURIComponent(topic + ' review OR problem OR worth it') + '&sort=relevance&t=year&limit=15&raw_json=1';
+  let direct = '';
+  try {
+    const data = JSON.parse(await fetchText(directUrl, 12000));
+    direct = (data.data?.children || []).map(item => {
+      const p = item.data || {};
+      return [p.title, p.selftext, 'subreddit: ' + p.subreddit, 'comments: ' + p.num_comments, p.permalink ? 'https://reddit.com' + p.permalink : ''].filter(Boolean).join('\n');
+    }).join('\n\n');
+  } catch(e) {}
+  const web = await searchJina(`site:reddit.com ${topic} reddit review complaints praise buyer experience`);
+  return { source:'reddit', topic, text:[direct, web].filter(Boolean).join('\n\n'), items:[], count:0, queries:['browser fallback reddit search'] };
+}
+
+async function searchX(topic) {
+  try { return await searchLocal('x', topic); } catch(e) {}
+  return { source:'x', topic, text:await searchJina(`site:x.com OR site:twitter.com ${topic} viral review hot take complaint worth it`), items:[], count:0, queries:['browser fallback x search'] };
+}
+
+async function searchAmazon(topic) {
+  try { return await searchLocal('amazon', topic); } catch(e) {}
+  const reviewSearch = await searchJina(`site:amazon.com ${topic} "customer reviews" "verified purchase" "1 star" "5 star"`);
+  let listing = '';
+  try {
+    listing = await fetchText('https://r.jina.ai/https://www.amazon.com/s?k=' + encodeURIComponent(topic), 16000);
+  } catch(e) {}
+  return { source:'amazon', topic, text:[reviewSearch, listing].filter(Boolean).join('\n\n'), items:[], count:0, queries:['browser fallback amazon search'] };
+}
+
+function payloadItems(payload) {
+  if (payload && Array.isArray(payload.items) && payload.items.length) {
+    return payload.items.map(item => ({
+      title: cleanLine(item.title || ''),
+      snippet: cleanLine(item.snippet || item.text || ''),
+      url: item.url || '',
+      type: item.type || 'result',
+      score: item.score || 0
+    }));
+  }
+  const raw = typeof payload === 'string' ? payload : (payload?.text || '');
+  return raw.split(/\n{2,}/).map(block => {
+    const lines = block.split(/\n+/).map(cleanLine).filter(Boolean);
+    return { title: lines[0] || '', snippet: lines.slice(1).join(' ') || lines[0] || '', url: (block.match(/https?:\/\/[^\s)]+/) || [''])[0], type:'text_result', score:0 };
+  });
+}
+
+function analyzeSource(source, payload, topic) {
+  const raw = typeof payload === 'string' ? payload : (payload?.text || '');
+  const topicWords = wordsFromTopic(topic);
+  const pain = /(broke|bad|problem|issue|complaint|returned|refund|cheap|leak|fake|stopped|slow|expensive|overpriced|disappoint|warning|hate|regret|one star|1 star|not worth|doesn't|didn't|poor|flimsy|hard to clean|battery|warranty)/i;
+  const praise = /(love|best|great|works|worth|favorite|helped|useful|quality|durable|five star|5 star|recommend|better|amazing|perfect|easy|solid|reliable|daily|repeat buy)/i;
+  const surprise = /(didn't expect|surpris|unexpected|weird|hack|trick|secret|nobody|actually|viral|controversial|honest|before you buy|wish i knew|turns out|not obvious)/i;
+  const seen = new Set();
+  const items = payloadItems(payload).map(item => {
+    const text = cleanLine([item.title, item.snippet].filter(Boolean).join(' - '));
+    const lower = text.toLowerCase();
+    let score = item.score || 0;
+    topicWords.forEach(w => { if (lower.includes(w)) score += 3; });
+    if (pain.test(text)) score += 4;
+    if (praise.test(text)) score += 3;
+    if (surprise.test(text)) score += 3;
+    return {
+      ...item,
+      text,
+      score,
+      tags: {
+        pain: pain.test(text),
+        praise: praise.test(text),
+        surprise: surprise.test(text)
+      }
+    };
+  }).filter(item => {
+    if (item.text.length < 35 || item.text.length > 320) return false;
+    const key = item.text.toLowerCase().replace(/\W+/g, ' ').slice(0, 150);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return item.score > 2 || topicWords.some(w => item.text.toLowerCase().includes(w));
+  }).sort((a,b) => b.score - a.score).slice(0, 16);
+  const byTag = tag => items.filter(item => item.tags[tag]);
+  const fallback = items.length ? items : raw.split(/\n+/).map(cleanLine).filter(line => line.length > 35 && line.length < 260).slice(0, 8).map(text => ({ text, title:'', snippet:text, url:'', tags:{}, score:0 }));
+  const urls = [...new Set([...items.map(i => i.url), ...(raw.match(/https?:\/\/[^\s)]+/g) || [])].filter(Boolean).filter(u => !u.includes('google')).slice(0,5))];
+  return {
+    source,
+    raw,
+    items: fallback,
+    pain: (byTag('pain').length ? byTag('pain') : fallback).slice(0,5),
+    praise: (byTag('praise').length ? byTag('praise') : fallback.slice(1)).slice(0,5),
+    surprise: (byTag('surprise').length ? byTag('surprise') : fallback.slice(2)).slice(0,5),
+    snippets: fallback.slice(0,10),
+    urls,
+    queries: payload?.queries || [],
+    count: payload?.count || fallback.length
+  };
+}
+
+function pickEvidence(group, kind, index, fallback) {
+  const pool = group?.[kind]?.length ? group[kind] : group?.snippets || [];
+  const item = pool[index % Math.max(pool.length, 1)];
+  if (item) return item;
+  return { text:fallback, title:'', snippet:fallback, url:'', tags:{}, score:0 };
+}
+
+function evidenceText(item, topic) {
+  return shortInsight(item?.text || item?.snippet || item?.title, topic);
+}
+
+function shortInsight(text, topic) {
+  const cleaned = cleanLine(text || '').replace(/Title:|URL:|Markdown Content:/gi,'').trim();
+  if (!cleaned) return `buyers are split on whether ${topic} is actually worth it`;
+  return cleaned.length > 145 ? cleaned.slice(0,142).replace(/\s+\S*$/,'') + '...' : cleaned;
+}
+
+function countWords(str) {
+  return (str || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+function makeHook(topic, hook, insight, variant) {
+  const hooks = {
+    'Pain Point': [
+      `Stop buying ${topic} before you hear this.`,
+      `${topic} has one problem reviews keep repeating.`,
+      `This is the ${topic} complaint people bury.`
+    ],
+    'Hot Take': [
+      `${topic} is not the simple yes people want.`,
+      `Hot take: ${topic} reviews are telling on themselves.`,
+      `The hype around ${topic} misses the real issue.`
+    ],
+    'Story': [
+      `I went looking for ${topic} reviews and found a pattern.`,
+      `People bought ${topic} for one reason, then mentioned this.`,
+      `I checked the messy reviews so you do not have to.`
+    ],
+    'Surprising Fact': [
+      `The weirdest thing about ${topic} is in the bad reviews.`,
+      `One tiny pattern changes how I see ${topic}.`,
+      `${topic} buyers keep revealing the same hidden tradeoff.`
+    ],
+    'Question': [
+      `Would you still buy ${topic} after hearing this?`,
+      `Why are ${topic} reviews all arguing about this?`,
+      `Is ${topic} actually worth it, or just loud online?`
+    ],
+    'POV': [
+      `POV: you read ${topic} reviews before buying.`,
+      `POV: ${topic} looked perfect until real buyers talked.`,
+      `POV: the comments saved you from a lazy buy.`
+    ]
+  };
+  const list = hooks[hook] || hooks['Pain Point'];
+  return list[variant % list.length];
+}
+
+function targetWords(text, min=74, max=96) {
+  const words = countWords(text);
+  if (words >= min && words <= max) return text;
+  if (words < min) return `${text} That is the part most product pages will not clarify, but real users keep circling back to it.`;
+  return text.split(/\s+/).slice(0, max).join(' ').replace(/[,.]?$/, '.');
+}
+
+function sourceLine(label, item, topic) {
+  return `${label}: ${evidenceText(item, topic)}`;
+}
+
+function buildScripts(topic, platform, hook, angle, research) {
+  const voice = angle ? `as a ${angle}, ` : '';
+  const rPain = pickEvidence(research.reddit, 'pain', 0, `Reddit buyers keep asking whether ${topic} is worth the tradeoff`);
+  const rPraise = pickEvidence(research.reddit, 'praise', 1, `Reddit users praise ${topic} when expectations are realistic`);
+  const rSurprise = pickEvidence(research.reddit, 'surprise', 2, `Reddit threads reveal a less obvious use case for ${topic}`);
+  const xBuzz = pickEvidence(research.twitter, 'surprise', 0, `X reactions are split between hype and skepticism around ${topic}`);
+  const xPain = pickEvidence(research.twitter, 'pain', 1, `X complaints focus on the part buyers notice after the first use`);
+  const aPain = pickEvidence(research.amazon, 'pain', 0, `Amazon reviewers flag one recurring product tradeoff`);
+  const aPraise = pickEvidence(research.amazon, 'praise', 1, `Amazon buyers praise it when the use case is specific`);
+  const aSurprise = pickEvidence(research.amazon, 'surprise', 2, `Amazon reviews mention a detail that is easy to miss`);
+  const variants = [
+    {
+      label:'Complaint Pattern',
+      core:rPain,
+      cta:'Check the real reviews before you buy.',
+      evidence:[sourceLine('Reddit', rPain, topic), sourceLine('Amazon', aPain, topic), sourceLine('X', xPain, topic)],
+      body: () => targetWords(`${voice}I would not start with the star rating on ${topic}. I would start with the complaint that repeats. Reddit points to ${evidenceText(rPain, topic)}. Amazon backs that up with ${evidenceText(aPain, topic)}. And on X, the short version is ${evidenceText(xPain, topic)}. So the question is not "is it good?" It is: can you live with that tradeoff every time you use it?`)
+    },
+    {
+      label:'Praise vs Reality',
+      core:aPraise,
+      cta:'Save this for your comparison list.',
+      evidence:[sourceLine('Amazon', aPraise, topic), sourceLine('Reddit', rPraise, topic), sourceLine('X', xBuzz, topic)],
+      body: () => targetWords(`The people who love ${topic} are not random. Amazon praise clusters around ${evidenceText(aPraise, topic)}. Reddit adds a useful caveat: ${evidenceText(rPraise, topic)}. X makes it feel louder because ${evidenceText(xBuzz, topic)}. That means this is probably a great buy for one kind of person, and a disappointing buy for someone expecting it to solve everything.`)
+    },
+    {
+      label:'Viral Hot Take',
+      core:xBuzz,
+      cta:'Send this to someone about to impulse buy.',
+      evidence:[sourceLine('X', xBuzz, topic), sourceLine('Reddit', rSurprise, topic), sourceLine('Amazon', aSurprise, topic)],
+      body: () => targetWords(`Here is the hot take on ${topic}: the viral conversation is not the whole review. X is reacting to ${evidenceText(xBuzz, topic)}. But Reddit gives the more useful context: ${evidenceText(rSurprise, topic)}. Amazon adds the buyer detail: ${evidenceText(aSurprise, topic)}. So if it looks like an obvious yes online, slow down and check whether the real-world use case matches your life.`)
+    },
+    {
+      label:'Buyer Warning',
+      core:aPain,
+      cta:'Do not buy it blind.',
+      evidence:[sourceLine('Amazon', aPain, topic), sourceLine('Reddit', rPain, topic), sourceLine('X', xPain, topic)],
+      body: () => targetWords(`Before buying ${topic}, ask three questions. One: does the Amazon complaint, ${evidenceText(aPain, topic)}, matter to you? Two: does the Reddit pattern, ${evidenceText(rPain, topic)}, sound like your exact use case? Three: are you being pulled by X hype around ${evidenceText(xPain, topic)}? If any answer feels fuzzy, wait. The bad reviews are basically telling you what to inspect first.`)
+    },
+    {
+      label:'Unexpected Use',
+      core:rSurprise,
+      cta:'Follow for the no-fluff version.',
+      evidence:[sourceLine('Reddit', rSurprise, topic), sourceLine('Amazon', aPraise, topic), sourceLine('X', xBuzz, topic)],
+      body: () => targetWords(`The most interesting thing about ${topic} is not the feature list. It is how people actually use it. Reddit surfaces this: ${evidenceText(rSurprise, topic)}. Amazon praise points to ${evidenceText(aPraise, topic)}. X shows why people are talking: ${evidenceText(xBuzz, topic)}. My verdict: buy it for that narrow job, not for the fantasy version in your head.`)
+    }
+  ];
+  return variants.map((v, i) => {
+    const core = evidenceText(v.core, topic);
+    const body = v.body();
+    const hookLine = makeHook(topic, hook, core, i);
+    const words = countWords([hookLine, body, v.cta].join(' '));
+    return {
+      id: i + 1,
+      label: v.label,
+      hook: hookLine,
+      body,
+      cta: v.cta,
+      word_count: words,
+      estimated_seconds: Math.max(30, Math.min(40, Math.round(words / 2.45))),
+      evidence: v.evidence,
+      why_viral: `${v.label}: built from distinct Reddit/X/Amazon evidence instead of a generic product pitch.`
+    };
+  });
+}
+
+async function runAgent() {
+  const topic = document.getElementById('topicInput').value.trim();
+  const product = document.getElementById('productInput').value.trim();
+  const solution = document.getElementById('solutionInput').value.trim();
+  const platform = document.getElementById('platformSel').value;
+  const angle = document.getElementById('angleInput').value.trim();
+  if (!topic) { alert('Enter a topic first!'); return; }
+
+  const sessionId = Date.now();
+  const session = { id:sessionId, topic, platform, hook:hookStyle, createdAt:Date.now() };
+  sessions.unshift(session);
+
+  const btn = document.getElementById('launchBtn');
+  btn.disabled = true; btn.textContent = '⚙ AGENT RUNNING...';
+  document.getElementById('logCol').innerHTML = '';
+  document.getElementById('outputCol').innerHTML = '<div class="out-empty"><div style="font-size:28px;opacity:0.12">⚙</div><div>Searching Reddit, X and Amazon...</div></div>';
+  document.getElementById('pipelineActions').innerHTML = '';
+  setNav('running','active'); setProgress(0);
+  document.getElementById('pipelineTitle').textContent = topic.slice(0,35)+(topic.length>35?'…':'');
+  document.getElementById('pipelineMeta').textContent = platform+' · '+hookStyle+(angle?' · '+angle:'');
+  addToHistory(session);
+
+  const log = (type, tag, text, subs=[]) => addLog(type, tag, text, subs);
+  log('info','',`Mission: research "${topic}" · position "${product || topic}" · ${platform}`);
+  await sleep(300);
+
+  setStep('reddit','active');
+  log('running','Research','Searching Reddit, X/Twitter, and Amazon for user reviews, complaints, and buyer language...');
+  setProgress(8);
+  let payload;
+  try {
+    payload = await apiGet('/api/generate?' + new URLSearchParams({
+      topic,
+      product,
+      solution,
+      platform,
+      hook: hookStyle,
+      angle
+    }).toString());
+  } catch(e) {
+    log('revision','API','Could not reach the local research server. Start it with: node server.mjs',[
+      { text: location.protocol === 'file:' ? 'You opened the app as a file. Use http://127.0.0.1:8765/ or http://127.0.0.1:8766/ after starting the server.' : String(e.message || e), hi: true }
+    ]);
+    btn.disabled=false; btn.textContent='▶ LAUNCH AGENT';
+    setNav('idle',''); setProgress(0);
+    return;
+  }
+
+  const research = payload.research || {};
+  const counts = payload.counts || {};
+  const problems = payload.problems || [];
+
+  log('finding','Reddit',`Scanned ${counts.reddit || 0} Reddit signals`,[
+    { text: problems[0]?.evidence?.find(e => e.source === 'reddit')?.text || 'Reddit public access may be limited, but RSS/search evidence was checked.', hi: true }
+  ]);
+  setStep('reddit','done'); setProgress(25);
+
+  setStep('twitter','active');
+  log(counts.x ? 'finding' : 'revision','X / Twitter', counts.x ? `Scanned ${counts.x} X/Twitter signals` : 'Public X/Twitter search was limited',[
+    { text: payload.warning || 'For direct recent tweets, run the server with X_BEARER_TOKEN or TWITTER_BEARER_TOKEN.', hi: !counts.x }
+  ]);
+  setStep('twitter','done'); setProgress(55);
+
+  setStep('amazon','active');
+  log('finding','Amazon',`Scanned ${counts.amazon || 0} Amazon/product-review signals`,[
+    { text: problems[0]?.evidence?.find(e => e.source === 'amazon')?.text || 'Amazon listings and public review search results were checked.', hi: true }
+  ]);
+  setStep('amazon','done'); setProgress(72);
+
+  setStep('write','active');
+  await sleep(200);
+  log('running','Analyzer','Extracting user problems and mapping them to your product resolution...');
+  setProgress(82);
+
+  problems.slice(0,3).forEach((p, i) => {
+    log('finding',`Problem ${i+1}`,p.problem,[
+      { text: `Sources: ${(p.sources || []).join(', ') || 'public web'} · Resolution: ${(payload.scripts?.[i]?.evidence || []).find(line => line.startsWith('Resolution:'))?.replace('Resolution: ','') || 'mapped in scripts'}`, hi: true }
+    ]);
+  });
+
+  const scripts = payload.scripts || [];
+  log('finding','Script Writer',`5 scripts complete · ${scripts.map(s=>s.estimated_seconds+'s').join(', ')}`,[
+    { text: `Script 1 hook: "${scripts[0].hook}"`, hi: true },
+    { text: 'Each script ties a user complaint to your product resolution.' }
+  ]);
+
+  setStep('write','done'); setStep('done','done');
+  setProgress(100);
+  await sleep(200);
+
+  log('done','✓ COMPLETE',`5 research-backed scripts ready · 30-40 seconds each`,[
+    { text: 'Copy one card or download all from the output panel →', hi: true }
+  ]);
+
+  const hstatus = document.getElementById('hstatus-'+sessionId);
+  if (hstatus) { hstatus.textContent='done'; hstatus.className='h-status done'; }
+
+  setNav('complete','done');
+  renderScripts(scripts, topic, platform, hookStyle, research);
+  window._scripts=scripts; window._topic=topic; window._research=research;
+  document.getElementById('pipelineActions').innerHTML = `
+    <button class="action-btn primary" onclick="copyFull(this)">⎘ Copy All</button>
+    <button class="action-btn" onclick="downloadScript()">↓ Download All</button>`;
+
+  btn.disabled=false; btn.textContent='▶ LAUNCH AGENT';
+}
+
+function renderScripts(scripts, topic, platform, hook, research) {
+  window._scripts=scripts; window._topic=topic; window._research=research;
+  const cards = scripts.map((s, idx) => `
+    <div class="script-card">
+      <div class="script-card-top">
+        <span class="sc-badge hook">#${idx+1} ${esc(s.label)}</span>
+        <span class="sc-badge hook">${esc(s.style || hook)}</span>
+        <span class="sc-badge platform">${esc(s.format || platform)}</span>
+        <span class="sc-duration">${esc(s.duration || ((s.estimated_seconds||30)+'s'))} · ${s.word_count||78}w</span>
+      </div>
+      <div class="script-section">
+        <div class="sc-tag">Hook — first 3 seconds</div>
+        <div class="sc-hook">"${esc(s.hook)}"</div>
+      </div>
+      <div class="script-section">
+        <div class="sc-tag">Timed Script + Visual Direction</div>
+        <div class="sc-body">${esc(s.body)}</div>
+      </div>
+      <div class="script-section">
+        <div class="sc-tag">Call to Action</div>
+        <div class="sc-cta">${esc(s.cta)}</div>
+      </div>
+      <div class="script-section">
+        <div class="sc-tag">Caption</div>
+        <div class="sc-caption">${esc(s.caption || '')}</div>
+      </div>
+      <div class="script-section">
+        <div class="sc-tag">Hashtags</div>
+        <div class="sc-hashtags">${esc(s.hashtags || '')}</div>
+      </div>
+      <div class="sc-why">★ ${esc(s.why_viral)}</div>
+      <div class="sc-evidence">
+        ${(s.evidence || []).map(line => `<div class="sc-evidence-line"><strong>${esc(line.split(':')[0])}:</strong>${esc(line.slice(line.indexOf(':')+1))}</div>`).join('')}
+      </div>
+      <div class="sources-row">
+        <div class="src-chip reddit">reddit ${research?.reddit?.count || research?.reddit?.snippets?.length || 0}</div>
+        <div class="src-chip twitter">x ${research?.x?.count || research?.twitter?.count || research?.twitter?.snippets?.length || 0}</div>
+        <div class="src-chip amazon">amazon ${research?.amazon?.count || research?.amazon?.snippets?.length || 0}</div>
+      </div>
+      <div class="sc-actions">
+        <button class="sc-btn" onclick="copyCard(this, ${idx})">⎘ Copy</button>
+        <button class="sc-btn" onclick="downloadScript(${idx})">↓ Download</button>
+        <button class="sc-btn" onclick="runAgent()">↻ Regenerate</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('outputCol').innerHTML = `
+    <div class="out-section-title">5 Script Options</div>
+    ${cards}`;
+}
+
+function scriptText(s, idx) {
+  const evidence = (s.evidence || []).map(line => `- ${line}`).join('\n');
+  return `SCRIPT ${idx+1} - ${s.label}\n\nPLATFORM:\n${s.format || ''}\n\nDURATION:\n${s.duration || '~'+s.estimated_seconds+'s'}\n\nSTYLE:\n${s.style || ''}\n\nHOOK:\n"${s.hook}"\n\nTIMED SCRIPT + VISUAL DIRECTION:\n${s.body}\n\nCTA:\n${s.cta}\n\nCAPTION:\n${s.caption || ''}\n\nHASHTAGS:\n${s.hashtags || ''}\n\nRESEARCH USED:\n${evidence || '- No source-specific evidence captured'}\n\nWords: ${s.word_count}\nWhy it works: ${s.why_viral}`;
+}
+
+function copyCard(btn, idx) {
+  const s=window._scripts[idx];
+  navigator.clipboard.writeText(scriptText(s, idx));
+  btn.textContent='✓ Copied!'; btn.classList.add('copied');
+  setTimeout(()=>{btn.textContent='⎘ Copy';btn.classList.remove('copied')},2000);
+}
+function copyFull(btn) {
+  navigator.clipboard.writeText((window._scripts || []).map(scriptText).join('\n\n'+'─'.repeat(40)+'\n\n'));
+  const orig=btn.textContent; btn.textContent='✓ Copied!';
+  setTimeout(()=>btn.textContent=orig,2000);
+}
+function downloadScript(idx) {
+  const scripts=window._scripts || []; const t=window._topic;
+  const text = typeof idx === 'number'
+    ? scriptText(scripts[idx], idx)
+    : `VIDEO SCRIPTS - ${t.toUpperCase()}\n${'─'.repeat(40)}\n\n${scripts.map(scriptText).join('\n\n'+'─'.repeat(40)+'\n\n')}`;
+  const blob=new Blob([text],{type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`swarm_${t.replace(/\s/g,'_')}${typeof idx === 'number' ? '_script_'+(idx+1) : '_5_scripts'}.txt`; a.click();
+}
+</script>
+</body>
+</html>
